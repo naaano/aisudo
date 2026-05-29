@@ -1,0 +1,237 @@
+# aisudo default policy
+# This ships with aisudo and provides sensible out-of-the-box security.
+# Agents may propose changes; humans always approve them.
+
+[defaults]
+# Unknown actions default to allow (per ADR-0001: secret broker, not full gate)
+# Exception: secret access defaults to ask (secrets are the primary protected resource)
+unknown = "allow"
+unknown_secrets = "ask"
+
+# ─── Package Managers ────────────────────────────────────────────────
+
+[[rules]]
+name = "ask npm install"
+action = "exec"
+argv_any_of = [
+    ["npm", "install", "*"],
+    ["npm", "add", "*"],
+    ["npm", "ci", "*"],
+]
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask pnpm install"
+action = "exec"
+argv_any_of = [
+    ["pnpm", "install", "*"],
+    ["pnpm", "add", "*"],
+]
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask yarn install"
+action = "exec"
+argv_any_of = [
+    ["yarn", "install", "*"],
+    ["yarn", "add", "*"],
+]
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask pip install"
+action = "exec"
+argv_any_of = [
+    ["pip", "install", "*"],
+    ["pip3", "install", "*"],
+    ["pip", "install", "git+*"],
+    ["pip3", "install", "git+*"],
+]
+decision = "ask"
+risk = "high"
+
+# ─── Destructive / Dangerous ─────────────────────────────────────────
+
+[[rules]]
+name = "deny sudo"
+action = "exec"
+argv = ["sudo", "*"]
+decision = "deny"
+risk = "critical"
+
+[[rules]]
+name = "deny rm -rf /"
+action = "exec"
+argv = ["rm", "-rf", "/"]
+decision = "deny"
+risk = "critical"
+
+[[rules]]
+name = "ask rm -rf"
+action = "exec"
+argv_any_of = [
+    ["rm", "-rf", "*"],
+    ["rm", "-r", "-f", "*"],
+    ["rm", "-fr", "*"],
+]
+decision = "ask"
+risk = "high"
+
+# ─── Publishing / Deploying ──────────────────────────────────────────
+
+[[rules]]
+name = "ask npm publish"
+action = "exec"
+argv = ["npm", "publish", "*"]
+decision = "ask"
+risk = "critical"
+
+[[rules]]
+name = "ask cargo publish"
+action = "exec"
+argv = ["cargo", "publish", "*"]
+decision = "ask"
+risk = "critical"
+
+[[rules]]
+name = "ask git push"
+action = "exec"
+argv_any_of = [
+    ["git", "push", "*"],
+    ["git", "push"],
+]
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask terraform apply"
+action = "exec"
+argv = ["terraform", "apply", "*"]
+decision = "ask"
+risk = "critical"
+
+# ─── Sensitive Files ─────────────────────────────────────────────────
+
+[[rules]]
+name = "deny ssh private key access"
+action_any_of = ["file-read", "file-write"]
+path = "~/.ssh/**"
+decision = "deny"
+risk = "critical"
+
+[[rules]]
+name = "ask env file access"
+action_any_of = ["file-read", "file-write"]
+path = "**/.env*"
+decision = "ask"
+risk = "high"
+
+# ─── Secrets ─────────────────────────────────────────────────────────
+
+[[rules]]
+name = "ask github token"
+action = "secret"
+resource = "GITHUB_TOKEN"
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask npm token"
+action = "secret"
+resource = "NPM_TOKEN"
+decision = "ask"
+risk = "high"
+
+[[rules]]
+name = "ask any secret"
+action = "secret"
+resource = "*"
+decision = "ask"
+risk = "medium"
+
+# ─── Safe Operations ─────────────────────────────────────────────────
+
+[[rules]]
+name = "allow git status"
+action = "exec"
+argv = ["git", "status"]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow git diff"
+action = "exec"
+argv_any_of = [
+    ["git", "diff", "*"],
+    ["git", "diff"],
+]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow git log"
+action = "exec"
+argv_any_of = [
+    ["git", "log", "*"],
+    ["git", "log"],
+]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow ls and friends"
+action = "exec"
+argv_any_of = [
+    ["ls", "*"],
+    ["ls"],
+    ["cat", "*"],
+    ["head", "*"],
+    ["tail", "*"],
+    ["wc", "*"],
+    ["find", "*"],
+    ["grep", "*"],
+    ["rg", "*"],
+]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow cargo check/build/test"
+action = "exec"
+argv_any_of = [
+    ["cargo", "check", "*"],
+    ["cargo", "build", "*"],
+    ["cargo", "test", "*"],
+    ["cargo", "clippy", "*"],
+    ["cargo", "fmt", "*"],
+    ["cargo", "run", "*"],
+]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow mix test"
+action = "exec"
+argv_any_of = [
+    ["mix", "test", "*"],
+    ["mix", "test"],
+    ["mix", "format", "*"],
+]
+decision = "allow"
+risk = "low"
+
+[[rules]]
+name = "allow node/python scripts"
+action = "exec"
+argv_any_of = [
+    ["node", "*"],
+    ["python", "*"],
+    ["python3", "*"],
+    ["deno", "*"],
+    ["bun", "*"],
+]
+decision = "allow"
+risk = "low"

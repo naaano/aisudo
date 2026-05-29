@@ -16,3 +16,15 @@ Thumbs.db
 
 # aisudo runtime (generated at runtime, not checked in)
 ~/.aisudo/
+
+# Secrets and encrypted files
+*.enc
+*.key
+*.pem
+.env
+.env.*
+
+
+# Added by cargo
+
+/target
