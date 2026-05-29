@@ -1,0 +1,18 @@
+# aisudo .gitignore
+
+# Rust / Cargo
+/target/
+Cargo.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# aisudo runtime (generated at runtime, not checked in)
+~/.aisudo/
