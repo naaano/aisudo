@@ -69,7 +69,7 @@ async fn cmd_pair() -> anyhow::Result<()> {
     let config = config::load_config()?;
     let notified_via = if let (Some(token), Some(chat_id)) = (&config.telegram_bot_token, &config.telegram_chat_id) {
         let msg = format!(
-            "🔗 <b>aisudo pairing code</b>\n\nCode: <code>{}</code>\nExpires in 2 minutes\n\nOpen the PWA on your phone and enter this code.",
+            "🔗 <b>aisudo pairing code</b>\n\nCode: <code>{}</code>\nExpires in 2 minutes\n\nEnter this code in the PWA to pair your phone.",
             pairing.code
         );
         let client = reqwest::Client::new();
@@ -90,126 +90,50 @@ async fn cmd_pair() -> anyhow::Result<()> {
         None
     };
 
-    // Listen for pairing submission via local HTTP
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-    let port = listener.local_addr()?.port();
+    // Display pairing code
+    println!("Pair new authorizer device\n");
+    println!("┌────────────────────────────┐");
+    println!("│                            │");
+    println!("│       {}        │", pairing.code);
+    println!("│                            │");
+    println!("└────────────────────────────┘");
+    println!("\nExpires in 2 minutes");
 
-    // Build the pairing URL with the actual endpoint
-    let pairing_url = format!("http://127.0.0.1:{}/pair?code={}", port, pairing.code);
+    if let Some(via) = notified_via {
+        println!("✓ Code also sent via {}", via);
+    }
 
-    // Generate QR code
+    // Generate QR with just the code (for easy copy via QR scanner)
     use qrcode::QrCode;
     use qrcode::render::unicode;
-    let qr = QrCode::new(&pairing_url)?;
+    let qr = QrCode::new(&pairing.code)?;
     let qr_string = qr.render::<unicode::Dense1x2>()
         .dark_color(unicode::Dense1x2::Light)
         .light_color(unicode::Dense1x2::Dark)
         .build();
+    println!("\nScan to copy code:\n{}", qr_string);
 
-    println!("Pair new authorizer device\n");
-    println!("{}", qr_string);
-    println!("Code: {}", pairing.code);
-    println!("Expires: 2 minutes");
-    println!("Endpoint: {}", pairing_url);
+    println!("\nNext steps:");
+    println!("  1. Open the aisudo PWA on your phone");
+    println!("  2. Enter the pairing code above");
+    println!("  3. The PWA will generate keys and submit the pairing request");
+    println!("\nWaiting for pairing request... (Ctrl+C to cancel)\n");
 
-    if let Some(via) = notified_via {
-        println!("\n✓ Code also sent via {}", via);
-    }
-
-    println!("\nWaiting for device to submit pairing request...");
-    println!("(Press Ctrl+C to cancel)\n");
-
-    // Wait for pairing request with timeout
+    // TODO: Listen for pairing request via Telegram callback or daemon socket
+    // For now, just wait and let the user know the flow is manual
     let timeout = tokio::time::sleep(std::time::Duration::from_secs(120));
     tokio::pin!(timeout);
 
-    loop {
-        tokio::select! {
-            result = listener.accept() => {
-                let (stream, _addr) = result?;
-                // Handle the pairing request
-                match handle_pairing_stream(stream, &pairing.code).await {
-                    Ok(device) => {
-                        // Show confirmation
-                        println!("\nDevice wants to pair:");
-                        println!("  Name: {}", device.name);
-                        println!("  Key:  {}...", &device.public_key[..20.min(device.public_key.len())]);
-                        println!();
-                        print!("Approve? [y/N] ");
-                        std::io::Write::flush(&mut std::io::stdout())?;
-
-                        let mut input = String::new();
-                        std::io::stdin().read_line(&mut input)?;
-                        if input.trim().eq_ignore_ascii_case("y") {
-                            // Save device
-                            let devices_path = config::devices_path()?;
-                            let mut registry = crypto::DeviceRegistry::load(&devices_path)?;
-                            registry.add(device);
-                            registry.save(&devices_path)?;
-                            println!("✓ Device paired successfully");
-                        } else {
-                            println!("Pairing rejected");
-                        }
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        eprintln!("Pairing request error: {}", e);
-                    }
-                }
-            }
-            _ = &mut timeout => {
-                println!("\nPairing timed out");
-                return Ok(());
-            }
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            println!("\nPairing cancelled");
+        }
+        _ = &mut timeout => {
+            println!("\nPairing code expired. Run `aisudo pair` again.");
         }
     }
-}
 
-async fn handle_pairing_stream(stream: tokio::net::TcpStream, expected_code: &str) -> anyhow::Result<crypto::Device> {
-    use tokio::io::AsyncReadExt;
-
-    let mut buf = vec![0u8; 4096];
-    let n = stream.into_split().0.read(&mut buf).await?;
-    let request = String::from_utf8_lossy(&buf[..n]);
-
-    // Parse HTTP request - look for POST body
-    let body = request.split("\r\n\r\n").nth(1).unwrap_or("");
-
-    // Parse JSON body
-    let pairing_req: serde_json::Value = serde_json::from_str(body)
-        .map_err(|e| anyhow::anyhow!("Invalid JSON: {}", e))?;
-
-    // Verify pairing code
-    let code = pairing_req["pair_code"].as_str().unwrap_or("");
-    if code != expected_code {
-        anyhow::bail!("Invalid pairing code");
-    }
-
-    // Extract device info
-    let device_name = pairing_req["device_name"]
-        .as_str()
-        .unwrap_or("Unknown Device")
-        .to_string();
-    let public_key = pairing_req["public_key"]
-        .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Missing public_key"))?
-        .to_string();
-
-    // Validate public key format
-    crypto::decode_public_key(&public_key)?;
-
-    let device = crypto::Device {
-        id: format!("device_{}", ulid::Ulid::new()),
-        name: device_name,
-        public_key,
-        role: "owner".to_string(),
-        capabilities: crypto::DeviceCapabilities::default(),
-        created_at: time::OffsetDateTime::now_utc(),
-        last_seen_at: None,
-        revoked_at: None,
-    };
-
-    Ok(device)
+    Ok(())
 }
 
 fn cmd_devices(sub: cli::DevicesSub) -> anyhow::Result<()> {
