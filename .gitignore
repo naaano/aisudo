@@ -15,7 +15,7 @@ Thumbs.db
 *.swo
 
 # aisudo runtime (generated at runtime, not checked in)
-~/.aisudo/
+.aisudo/
 
 # Secrets and encrypted files
 *.enc
