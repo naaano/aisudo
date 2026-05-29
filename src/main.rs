@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod audit;
 mod cli;
 mod config;
@@ -164,7 +166,7 @@ async fn cmd_pair() -> anyhow::Result<()> {
 }
 
 async fn handle_pairing_stream(stream: tokio::net::TcpStream, expected_code: &str) -> anyhow::Result<crypto::Device> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::io::AsyncReadExt;
 
     let mut buf = vec![0u8; 4096];
     let n = stream.into_split().0.read(&mut buf).await?;

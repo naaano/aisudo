@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -10,11 +9,11 @@ use tokio::sync::{Mutex, oneshot};
 
 use crate::audit::{self, AuditEntry};
 use crate::config::{self, Config};
-use crate::crypto::{self, DeviceRegistry, NonceStore};
+use crate::crypto::{DeviceRegistry, NonceStore};
 use crate::grants::{self, Grant};
 use crate::policy::{self, Evaluation, Policy};
-use crate::protocol::{Action, App, Decision, GrantMode, Request, Response, Severity};
-use crate::transport::{self, TelegramTransport, CallbackAction};
+use crate::protocol::{Action, Decision, GrantMode, Request, Response};
+use crate::transport::{TelegramTransport, CallbackAction};
 
 // ─── Daemon State ───────────────────────────────────────────────────
 
@@ -430,6 +429,7 @@ impl Policy {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use crate::protocol::App;
 
     fn test_state() -> DaemonState {
         let config = Config::default();

@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

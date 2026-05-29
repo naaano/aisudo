@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
 
@@ -131,7 +130,7 @@ pub async fn send_json(json_path: Option<String>) -> Result<()> {
         buf
     };
 
-    let request: Request = serde_json::from_str(&json_str)
+    let _request: Request = serde_json::from_str(&json_str)
         .context("Failed to parse request JSON")?;
 
     // Connect to daemon
@@ -196,6 +195,7 @@ pub async fn show_request(request_id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_build_request() {
